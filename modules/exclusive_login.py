@@ -16,7 +16,9 @@ def wrap_with_login_guard(demo):
         # Logged out message
         logged_out_view = gr.Column(visible=False)
         with logged_out_view:
-            gr.Markdown("## 🚪 You are logged out, or someone else is using the app.")
+            global current_user
+            with login_lock:                
+                logged_out_markdown = gr.Markdown(f"## 🚪 You are logged out, or {current_user} is using the app.")
 
         # App interface
         app_view = gr.Column(visible=False)
@@ -33,50 +35,18 @@ def wrap_with_login_guard(demo):
                 print(f"check_user {username} {current_user}")
                 if username == current_user or current_user is None:
                     current_user = username
-                    return gr.update(visible=False), gr.update(visible=True), f"## ✅ Logged in as: {username}", gr.update(visible=False)
+                    return gr.update(visible=False), gr.update(visible=True), f"## ✅ Logged in as: {username}", gr.update(visible=False), ""
                 else:
-                    return gr.update(visible=True), gr.update(visible=False), "", gr.update(visible=True)
+                    return gr.update(visible=True), gr.update(visible=False), "", gr.update(visible=True), f"## 🚪 User '{current_user}' is using the app."
                 
         def logout():
             global current_user
             with login_lock:     
                 current_user = None
-            return gr.update(visible=True), gr.update(visible=False), "", gr.update(visible=True)
+            return gr.update(visible=True), gr.update(visible=False), "", gr.update(visible=True), f"## 🚪 You are logged out."
 
         
-        init_btn.click(check_user, inputs=None, outputs=[logged_out_view, app_view, username_display, init_btn], queue=False)
-        logout_btn.click(logout, inputs=None, outputs=[logged_out_view, app_view, username_display, init_btn], queue=False)
+        init_btn.click(check_user, inputs=None, outputs=[logged_out_view, app_view, username_display, init_btn, logged_out_markdown], queue=False)
+        logout_btn.click(logout, inputs=None, outputs=[logged_out_view, app_view, username_display, init_btn, logged_out_markdown], queue=False)
 
     return guarded_demo
-
-def wrap_with_login_guard_2(demo):
-    with gr.Blocks() as guarded_demo:
-        state = gr.State({"logged_out": False})
-
-        # Logged out message + login button
-        logged_out_view = gr.Column(visible=False)
-        with logged_out_view:
-            gr.Markdown("## 🚪 You are logged out.\nPlease log in to continue.")
-            login_btn = gr.Button("Login")
-
-        # App interface
-        app_view = gr.Column(visible=True)
-        with app_view:
-            gr.Markdown(f"## ✅ You are logged in.")
-            demo.render()  # Reuse the instantiated app inside the wrapper
-            logout_btn = gr.Button("Logout")
-
-        # Login/Logout logic
-        def login(state_dict):
-            state_dict["logged_out"] = False
-            return gr.update(visible=False), gr.update(visible=True), state_dict
-
-        def logout(state_dict):
-            state_dict["logged_out"] = True
-            return gr.update(visible=True), gr.update(visible=False), state_dict
-
-        login_btn.click(login, inputs=state, outputs=[logged_out_view, app_view, state])
-        logout_btn.click(logout, inputs=state, outputs=[logged_out_view, app_view, state])
-
-    return guarded_demo
-
