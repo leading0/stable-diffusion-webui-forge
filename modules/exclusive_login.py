@@ -1,23 +1,24 @@
-
 import threading
 from typing import Iterable, Tuple
 import gradio as gr
+import time
 
 # Lock to handle concurrency safely
 login_lock = threading.Lock()
 current_user = None
-
+user_expiration_time = 0
+EXPIRATION_DURATION = 60 * 60  # Set expiration duration to 1 hour
 
 def wrap_with_login_guard(demo):
     with gr.Blocks() as guarded_demo:
-    
+
         init_btn = gr.Button("Start using Forge UI...")
 
         # Logged out message
         logged_out_view = gr.Column(visible=False)
         with logged_out_view:
-            global current_user
-            with login_lock:                
+            global current_user, user_expiration_time
+            with login_lock:
                 logged_out_markdown = gr.Markdown(f"## 🚪 You are logged out, or {current_user} is using the app.")
 
         # App interface
@@ -28,24 +29,31 @@ def wrap_with_login_guard(demo):
             logout_btn = gr.Button("Logout")
 
         # Initialization logic to check username and conditionally render
-        def check_user(request: gr.Request):   
-            global current_user
-            with login_lock:         
+        def check_user(request: gr.Request):
+            global current_user, user_expiration_time
+            with login_lock:
                 username = request.username if request.username else "Unknown User"
                 print(f"check_user {username} {current_user}")
-                if username == current_user or current_user is None:
-                    current_user = username
-                    return gr.update(visible=False), gr.update(visible=True), f"## ✅ Logged in as: {username}", gr.update(visible=False), ""
-                else:
-                    return gr.update(visible=True), gr.update(visible=False), "", gr.update(visible=True), f"## 🚪 User '{current_user}' is using the app."
+                current_time = time.time()
                 
+                if username == current_user or current_user is None or current_time > user_expiration_time :
+                    # Normal login logic
+                    current_user = username
+                    user_expiration_time = current_time + EXPIRATION_DURATION
+                    expiration:str = time.strftime("%Y-%m-%dT%H:%M:%S%z", time.localtime(user_expiration_time))
+                    return gr.update(visible=False), gr.update(visible=True), f"## ✅ Logged in as: {username} until {expiration}", gr.update(visible=False), ""
+                
+                else:
+                    expiration:str = time.strftime("%Y-%m-%dT%H:%M:%S%z", time.localtime(user_expiration_time))
+                    return gr.update(visible=True), gr.update(visible=False), "", gr.update(visible=True), f"## 🚪 User '{current_user}' is using the app until {expiration}."
+
         def logout():
-            global current_user
-            with login_lock:     
+            global current_user, user_expiration_time
+            with login_lock:
                 current_user = None
+                user_expiration_time = 0
             return gr.update(visible=True), gr.update(visible=False), "", gr.update(visible=True), f"## 🚪 You are logged out."
 
-        
         init_btn.click(check_user, inputs=None, outputs=[logged_out_view, app_view, username_display, init_btn, logged_out_markdown], queue=False)
         logout_btn.click(logout, inputs=None, outputs=[logged_out_view, app_view, username_display, init_btn, logged_out_markdown], queue=False)
 
