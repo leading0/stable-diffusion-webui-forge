@@ -7,6 +7,7 @@ import time
 login_lock = threading.Lock()
 current_user = None
 user_expiration_time = 0
+
 EXPIRATION_DURATION = 60 * 60  # Set expiration duration to 1 hour
 
 def wrap_with_login_guard(demo):
@@ -63,4 +64,33 @@ def wrap_with_login_guard(demo):
         renew_btn.click(check_user, inputs=None, outputs=[logged_out_view, app_view, username_display, init_btn, logged_out_markdown], queue=False)
         logout_btn.click(logout, inputs=None, outputs=[logged_out_view, app_view, username_display, init_btn, logged_out_markdown], queue=False)
 
+        gr.Timer(value=300, repeat=True).tick( 
+            fn=check_expiration_periodically,
+            inputs=None,
+            outputs=[logged_out_view, app_view, username_display, init_btn, logged_out_markdown]
+        )
+
     return guarded_demo
+
+def check_expiration_periodically():
+    global current_user, user_expiration_time    
+    with login_lock:        
+        now = time.time()      
+        if current_user and now > user_expiration_time:
+            current_user = None
+            user_expiration_time = 0
+            return (
+                gr.update(visible=True),    # logged_out_view
+                gr.update(visible=False),   # app_view
+                "⚠️ Session expired",       # username_display
+                gr.update(visible=True),    # init_btn
+                "## 🚪 Session expired.",   # logged_out_markdown
+            )
+        else:
+            return (
+                gr.skip(), 
+                gr.skip(),
+                gr.skip(),
+                gr.skip(), 
+                gr.skip(),
+            )
