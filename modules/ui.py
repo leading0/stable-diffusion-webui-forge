@@ -14,6 +14,7 @@ from modules.call_queue import wrap_gradio_gpu_call, wrap_queued_call, wrap_grad
 
 from modules import gradio_extensions, sd_schedulers  # noqa: F401
 from modules import sd_hijack, sd_models, script_callbacks, ui_extensions, deepbooru, extra_networks, ui_common, ui_postprocessing, progress, ui_loadsave, shared_items, ui_settings, timer, sysinfo, ui_checkpoint_merger, scripts, sd_samplers, processing, ui_extra_networks, ui_toprow, launch_utils
+from modules.exclusive_login import wrap_with_login_guard
 from modules.ui_components import FormRow, FormGroup, ToolButton, FormHTML, InputAccordion, ResizeHandleRow
 from modules.paths import script_path
 from modules.ui_common import create_refresh_button
@@ -1021,8 +1022,9 @@ def create_ui():
     if ui_settings_from_file != loadsave.ui_settings:
         loadsave.dump_defaults()
     demo.ui_loadsave = loadsave
+    
+    return wrap_with_login_guard(demo)
 
-    return demo
 
 
 def versions_html():
